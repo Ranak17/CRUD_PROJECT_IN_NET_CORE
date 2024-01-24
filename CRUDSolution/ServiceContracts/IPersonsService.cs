@@ -9,13 +9,13 @@ namespace ServiceContracts
 {
     public interface IPersonsService
     {
-        PersonResponse? AddPerson(PersonAddRequest? personAddRequest);
-        List<PersonResponse> GetAllPersons();
+        Task<PersonResponse?> AddPerson(PersonAddRequest? personAddRequest);
+        Task<List<PersonResponse>> GetAllPersons();
 
-        PersonResponse? GetPersonByPersonID(Guid? personID);
+        Task<PersonResponse?> GetPersonByPersonID(Guid? personID);
 
-        PersonResponse? UpdatePerson(PersonUpdateRequest? personUpdateRequest);
+        Task<PersonResponse?> UpdatePerson(PersonUpdateRequest? personUpdateRequest);
 
-        bool? DeletePerson(Guid? personID);
+        Task<bool?> DeletePerson(Guid? personID);
     }
 }

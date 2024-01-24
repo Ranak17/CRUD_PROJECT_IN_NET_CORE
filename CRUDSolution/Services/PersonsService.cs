@@ -1,35 +1,28 @@
 ﻿using Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using RepositoryContracts;
 using ServiceContracts;
 using ServiceContracts.DTO;
 using Services.Helpers;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Services
 {
     public class PersonsService : IPersonsService
     {
-        private readonly List<Person> _persons;
-        private readonly ICountriesService _countriesService;
+        //private readonly List<Person> _persons;
+        private readonly IPersonsRepository _personRepository;
+        private readonly ILogger<PersonsService> _logger;
 
-        public PersonsService()
+        public PersonsService(IPersonsRepository personRepository,ILogger<PersonsService> logger)
         {
-            _persons = new List<Person>();
-            _countriesService = new CountriesService();
+            _personRepository=personRepository;
+            _logger=logger;
         }
 
-        private PersonResponse ConvertPersonToPersonResponse(Person person)
+        public async Task<PersonResponse?> AddPerson(PersonAddRequest? personAddRequest)
         {
-            PersonResponse personResponse = person.ToPersonResponse();
-            personResponse.Country = _countriesService.GetCountryByCountryID(person.CountryID)?.CountryName;
-            return personResponse;
-        }
-        public PersonResponse? AddPerson(PersonAddRequest? personAddRequest)
-        {
+            _logger.LogInformation("AddPerson Service Execution started");
             if (personAddRequest == null) return null;
             //Model Validation
             ValidationHelper.ModelValidation(personAddRequest);
@@ -37,26 +30,31 @@ namespace Services
             if (personAddRequest.PersonName == null) throw new ArgumentException();
             Person person = personAddRequest.ToPerson();
             person.PersonID = Guid.NewGuid();
-            _persons.Add(person);
-            return ConvertPersonToPersonResponse(person);
+            await _personRepository.AddPerson(person);
+            _logger.LogInformation("AddPerson Service Execution finished");
+            return person.ToPersonResponse();
         }
 
-        public List<PersonResponse> GetAllPersons()
+        public async Task<List<PersonResponse>> GetAllPersons()
         {
-            return _persons.Select(temp => temp.ToPersonResponse()).ToList();
+            //Include() -  Navigation property.  "Country" is the property name in Person Class is called naviagation property
+            IList<Person> personsFromDB = await _personRepository.GetAllPersons();
+            return personsFromDB.Select(temp => temp.ToPersonResponse()).ToList();
         }
 
-        public PersonResponse? GetPersonByPersonID(Guid? personID)
+        public async Task<PersonResponse?> GetPersonByPersonID(Guid? personID)
         {
             if (personID == null) return null;
-            return _persons.FirstOrDefault(p => p.PersonID == personID)?.ToPersonResponse(); ;
+            //Include() -> Navigation Property
+            Person? personFromDB = await _personRepository.GetPersonByPersonID(personID.Value);
+            return personFromDB?.ToPersonResponse() ;
         }
 
-        public PersonResponse? UpdatePerson(PersonUpdateRequest? personUpdateRequest)
+        public async Task<PersonResponse?> UpdatePerson(PersonUpdateRequest? personUpdateRequest)
         {
             if (personUpdateRequest == null) return null;
             ValidationHelper.ModelValidation(personUpdateRequest);
-            Person? matchingPerson = _persons.FirstOrDefault(temp => temp.PersonID == personUpdateRequest.PersonID);
+            Person? matchingPerson = await _personRepository.GetPersonByPersonID(personUpdateRequest.PersonID);
             if (matchingPerson == null)
             {
                 throw new ArgumentException("Invalid Person Id");
@@ -68,16 +66,15 @@ namespace Services
             matchingPerson.Email = personUpdateRequest.Email;
             matchingPerson.Address = personUpdateRequest.Address;
             matchingPerson.DateOfBirth = personUpdateRequest.DateOfBirth;
-
             return matchingPerson.ToPersonResponse();
         }
 
-        public bool? DeletePerson(Guid? personID)
+        public async Task<bool?> DeletePerson(Guid? personID)
         {
             if (personID == null) return null;
-            Person? person = _persons.FirstOrDefault(temp => temp.PersonID == personID);
+            Person? person = await _personRepository.GetPersonByPersonID(personID.Value);
             if (person == null) return false;
-            _persons.RemoveAll(temp => temp.PersonID == personID);
+            await _personRepository.DeletePersonByPersonID(personID.Value);
             return true;
         }
     }
